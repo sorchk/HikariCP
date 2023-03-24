@@ -130,13 +130,14 @@ public class HikariConfig implements HikariConfigMXBean {
          loadProperties(systemProp);
       }
    }
-
+   public HikariConfig(ClassLoader extClassLoader) {
+      this();
+      if(extClassLoader!=null) {
+         this.extClassLoader = extClassLoader;
+      }
+   }
    public ClassLoader getExtClassLoader() {
       return extClassLoader;
-   }
-
-   public void setExtClassLoader(ClassLoader extClassLoader) {
-      this.extClassLoader = extClassLoader;
    }
 
    /**
@@ -481,25 +482,26 @@ public class HikariConfig implements HikariConfigMXBean {
 
    public void setDriverClassName(String driverClassName) {
       checkIfSealed();
-
       var driverClass = attemptFromContextLoader(driverClassName);
       try {
          if (driverClass == null) {
             driverClass = this.getClass().getClassLoader().loadClass(driverClassName);
             LOGGER.debug("Driver class {} found in the HikariConfig class classloader {}", driverClassName, this.getClass().getClassLoader());
          }
+      } catch (ClassNotFoundException e) {
+         LOGGER.warn("Failed to load driver class {} from HikariConfig class classloader {}", driverClassName, this.getClass().getClassLoader());
+      }
+      try {
          if (driverClass == null && this.getExtClassLoader() != null) {
             driverClass = this.getExtClassLoader().loadClass(driverClassName);
-            LOGGER.debug("Driver class {} found in the HikariConfig class classloader {}", driverClassName, this.getClass().getClassLoader());
+            LOGGER.debug("Driver class {} found in the HikariConfig class classloader {}", driverClassName, this.getExtClassLoader());
          }
       } catch (ClassNotFoundException e) {
-         LOGGER.error("Failed to load driver class {} from HikariConfig class classloader {}", driverClassName, this.getClass().getClassLoader());
+         LOGGER.warn("Failed to load driver class {} from HikariConfig class classloader {}", driverClassName,this.getExtClassLoader());
       }
-
       if (driverClass == null) {
          throw new RuntimeException("Failed to load driver class " + driverClassName + " in either of HikariConfig class loader or Thread context classloader");
       }
-
       try {
          driverClass.getConstructor().newInstance();
          this.driverClassName = driverClassName;
@@ -859,14 +861,17 @@ public class HikariConfig implements HikariConfigMXBean {
             overrideClass = this.getClass().getClassLoader().loadClass(exceptionOverrideClassName);
             LOGGER.debug("SQLExceptionOverride class {} found in the HikariConfig class classloader {}", exceptionOverrideClassName, this.getClass().getClassLoader());
          }
-         if (overrideClass == null && this.getExtClassLoader() != null) {
-            overrideClass = this.getExtClassLoader().loadClass(exceptionOverrideClassName);
-            LOGGER.debug("SQLExceptionOverride class {} found in the HikariConfig class classloader {}", exceptionOverrideClassName, this.getClass().getClassLoader());
-         }
       } catch (ClassNotFoundException e) {
          LOGGER.error("Failed to load SQLExceptionOverride class {} from HikariConfig class classloader {}", exceptionOverrideClassName, this.getClass().getClassLoader());
       }
-
+      try {
+         if (overrideClass == null && this.getExtClassLoader() != null) {
+            overrideClass = this.getExtClassLoader().loadClass(exceptionOverrideClassName);
+            LOGGER.debug("SQLExceptionOverride class {} found in the HikariConfig class classloader {}", exceptionOverrideClassName, this.getExtClassLoader());
+         }
+      } catch (ClassNotFoundException e) {
+         LOGGER.error("Failed to load SQLExceptionOverride class {} from HikariConfig class classloader {}", exceptionOverrideClassName, this.getExtClassLoader());
+      }
       if (overrideClass == null) {
          throw new RuntimeException("Failed to load SQLExceptionOverride class " + exceptionOverrideClassName + " in either of HikariConfig class loader or Thread context classloader");
       }
@@ -1059,8 +1064,9 @@ public class HikariConfig implements HikariConfigMXBean {
    }
 
    private void checkIfSealed() {
-      if (sealed)
+      if (sealed) {
          throw new IllegalStateException("The configuration of the pool is sealed once started. Use HikariConfigMXBean for runtime changes.");
+      }
    }
 
    private void logConfiguration() {
