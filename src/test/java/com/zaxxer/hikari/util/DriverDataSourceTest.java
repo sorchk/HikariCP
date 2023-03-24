@@ -46,7 +46,7 @@ public class DriverDataSourceTest {
 
    private void testExceptionMessage(String jdbcUrl) {
       try {
-         new DriverDataSource(jdbcUrl, null, new Properties(), null, null);
+         new DriverDataSource(jdbcUrl, null, null,new Properties(), null, null);
          fail();
       } catch (RuntimeException e) {
          String msg = e.getMessage();

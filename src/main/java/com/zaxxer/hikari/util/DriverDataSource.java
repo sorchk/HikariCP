@@ -38,7 +38,7 @@ public final class DriverDataSource implements DataSource
    private final Properties driverProperties;
    private Driver driver;
 
-   public DriverDataSource(String jdbcUrl, String driverClassName, Properties properties, String username, String password)
+   public DriverDataSource(String jdbcUrl, String driverClassName,ClassLoader extClassLoader, Properties properties, String username, String password)
    {
       this.jdbcUrl = jdbcUrl;
       this.driverProperties = new Properties();
@@ -84,6 +84,10 @@ public final class DriverDataSource implements DataSource
                   driverClass = this.getClass().getClassLoader().loadClass(driverClassName);
                   LOGGER.debug("Driver class {} found in the HikariConfig class classloader {}", driverClassName, this.getClass().getClassLoader());
                }
+               if (driverClass == null&&extClassLoader!=null) {
+                  driverClass = extClassLoader.loadClass(driverClassName);
+                  LOGGER.debug("Driver class {} found in the HikariConfig class classloader {}", driverClassName, this.getClass().getClassLoader());
+               }
             } catch (ClassNotFoundException e) {
                LOGGER.debug("Failed to load driver class {} from HikariConfig class classloader {}", driverClassName, this.getClass().getClassLoader());
             }
@@ -99,7 +103,7 @@ public final class DriverDataSource implements DataSource
       }
 
       final var sanitizedUrl = jdbcUrl.replaceAll("([?&;][^&#;=]*[pP]assword=)[^&#;]*", "$1<masked>");
-      
+
       try {
          if (driver == null) {
             driver = DriverManager.getDriver(jdbcUrl);
